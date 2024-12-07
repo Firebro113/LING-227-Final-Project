@@ -147,3 +147,12 @@ if __name__ == "__main__":
     clean("plato", True)
     clean("notplato", True)
     clean("dubia", False)
+
+    trainingSize = os.path.getsize(trainingFile)
+    validationSize = os.path.getsize(validationFile)
+    testSize = os.path.getsize(testFile)
+    sumSize = trainingSize+validationSize+testSize
+    dubiaSize = os.path.getsize(dubiaFile)
+
+    print(trainingSize/sumSize, validationSize/sumSize, testSize/sumSize, sumSize)
+    print(dubiaSize)
