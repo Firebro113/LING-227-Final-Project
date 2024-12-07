@@ -1,22 +1,23 @@
 import re
 import os
+import math
 import sys
 import random
 from unidecode import unidecode
 
 lengths = []
 
-def processFile(filename, dataType, trainingFile, validationFile, testFile):
+def processFile(filename, dataType, outputFile1, outputFile2, outputFile3):
     input1 = open("data_raw/" + dataType + "/" + filename, 'r', encoding='utf-8')
     clean = []
-    index = 0
 
-    for x, line in enumerate(input1):
+    for line in input1:
 
         # Removes all characters not part of the Greek alphabet, converts into Latin alphabet, removes all characters except alphabet and spaces
 
         line = re.sub(r'[A-Za-z]+', '', line)
         
+        # Diacritics including aspirations are lost
         line = unidecode(line)
         line = line.strip()
         line = line.replace('-', ' ')
@@ -43,100 +44,106 @@ def processFile(filename, dataType, trainingFile, validationFile, testFile):
 
     input1.close()
 
-    # Get documents based on predetermined size and split them into training, validation, and test sets (80%, 10%, 10% respectively)
+    value = -1
+    if dataType == "plato":
+        value = 1
+    elif dataType == "notplato":
+        value = 0
+    filenameNew = filename[:-4].replace(' ', '')
+    proem = str(value) + ' ' + filenameNew + ' '
 
-    trainingSet = open(trainingFile, 'a', encoding='utf-8')
-    validationSet = open(validationFile, 'a', encoding='utf-8')
-    testSet = open(testFile, 'a', encoding='utf-8')
+    document1 = ""
+    document2 = ""
+    document3 = ""
 
-    for index in range(len(clean)):
-        if (index + 1) * documentSize >= len(clean):
-            break
-        value = -1
-        if dataType == "plato":
-            value = 1
-        elif dataType == "notplato":
-            value = 0
-        document = str(value) + ' ' + filename[:-4].replace(' ', '') + ' ' + ' '.join(clean[index*documentSize:(index+1)*documentSize])
+    output1 = open(outputFile1, 'a', encoding='utf-8')
+    if outputFile2 == "":
+        document1 = proem + ' '.join(clean)
+        output1.write(document1 + '\n')
+    elif filenameNew == "Ion" or filenameNew == "Xenocrates":
+        output2 = open(outputFile2, 'a', encoding='utf-8')
+        document2 = proem + ' '.join(clean)
+        output2.write(document2 + '\n')
+        output2.close()
+    elif filenameNew == "Crito" or filenameNew == "IsocratesHelen":
+        output3 = open(outputFile3, 'a', encoding='utf-8')
+        document3 = proem + ' '.join(clean)
+        output3.write(document3 + '\n')
+        output3.close()
+    else:
+        validationIndex = 0
+        testIndex = 0
+        while validationIndex == testIndex:
+            validationIndex = random.randint(0, 9)
+            testIndex = random.randint(0, 9)
 
-        firstDigit = index % 10
-        if firstDigit <= 7:
-            trainingSet.write(document + '\n')
-        elif firstDigit <= 8:
-            validationSet.write(document + '\n')
-        else:
-            testSet.write(document + '\n')
-    
-    trainingSet.close()
-    validationSet.close()
-    testSet.close()
+        output2 = open(outputFile2, 'a', encoding='utf-8')
+        output3 = open(outputFile3, 'a', encoding='utf-8')
 
+        document1 = ' '.join(clean[: math.floor(0.8*len(clean))])
+        document2 = ' '.join(clean[math.floor(0.8*len(clean)): math.floor(0.9*len(clean))])
+        document3 = ' '.join(clean[math.floor(0.9*len(clean)): ])
+
+        document1 = proem + document1
+        document2 = proem + document2
+        document3 = proem + document3
+
+        output1.write(document1 + '\n')
+        output2.write(document2 + '\n')
+        output3.write(document3 + '\n')
+
+        output2.close()
+        output3.close()
+    output1.close()
+
+    print(len(document1.split()), len(document2.split()), len(document3.split()))
     return len(clean)
 
+def clean(dataType, split):
+    lengths = []
 
-def clean(dataTypes, folderName, documentSize, split):
+    parentPath = "data_clean"
 
-    parentPath = "data_" + str(documentSize)
-    currentPath = parentPath + "/" + folderName
+    trainingFile = parentPath + "/training.txt"
+    validationFile = parentPath + "/validation.txt"
+    testFile = parentPath + "/test.txt"
+    dubiaFile = parentPath + "/dubia.txt"
 
-    if split:
-        trainingFile = currentPath + "/training.txt"
-        validationFile = currentPath + "/validation.txt"
-        testFile = currentPath + "/test.txt"
-    else:
-        trainingFile = currentPath + "/main.txt"
-        validationFile = trainingFile
-        testFile = trainingFile
+    for filename in os.listdir("data_raw/" + dataType):
+        f = os.path.join("data_raw/" + dataType, filename)
+        if not os.path.isfile(f):
+            continue
+        
+        if split:
+            lengths += [processFile(filename, dataType, trainingFile, validationFile, testFile)]
+        else:
+            lengths += [processFile(filename, dataType, dubiaFile, "", "")]
+        
+        print(lengths[-1], filename)
+    
+    print(dataType, sum(lengths), '\n')
+
+if __name__ == "__main__":
+
+    parentPath = "data_clean"
+
+    trainingFile = parentPath + "/training.txt"
+    validationFile = parentPath + "/validation.txt"
+    testFile = parentPath + "/test.txt"
+    dubiaFile = parentPath + "/dubia.txt"
 
     # Create appropriate directories
 
     if not os.path.exists(parentPath):
         os.mkdir(parentPath)
-    if not os.path.exists(currentPath):
-        os.mkdir(currentPath)
     
-    # Wipe each file
-
     open(trainingFile, 'w').close()
     open(validationFile, 'w').close()
     open(testFile, 'w').close()
-
-    # Run the dataset creator for each file in each folder
-
-    lengths = []
-
-    for dataType in dataTypes:
-
-        for filename in os.listdir("data_raw/" + dataType):
-            f = os.path.join("data_raw/" + dataType, filename)
-            if os.path.isfile(f):
-                lengths += [processFile(filename, dataType, trainingFile, validationFile, testFile)]
-                print(lengths[-1], filename)
-    
-    with open(trainingFile, 'r') as trainingSet, open(validationFile, 'r') as validationSet, open(testFile, 'r') as testSet:
-        trainingLength = len(trainingSet.readlines())
-
-        if split:
-            validationLength = len(validationSet.readlines())
-            testLength = len(testSet.readlines())
-            totalLength = trainingLength+validationLength+testLength
-            if totalLength == 0:
-                totalLength = 1
-            print(trainingLength, trainingLength/totalLength, validationLength, validationLength/totalLength, testLength, testLength/totalLength, trainingLength+validationLength+testLength, "documents")
-        
-        else:
-            print(trainingLength, "documents")
-
-    if len(lengths) != len(set(lengths)):
-        print("ERROR")
-
-
-if __name__ == "__main__":
-
-    print("What is the document size?")
-    documentSize = int(input())
+    open(dubiaFile, 'w').close()
 
     # Run main function
     
-    clean(["plato", "notplato"], "main", documentSize, True)
-    clean(["dubia"], "dubia", documentSize, False)
+    clean("plato", True)
+    clean("notplato", True)
+    clean("dubia", False)
